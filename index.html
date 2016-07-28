@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>iOS Device Installer</title>
+<!-- Version 0.3 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="bootstrap-combined.min.css" rel="stylesheet">
+<script src="jquery-1.9.0.js" type="text/javascript"></script>
+<script src="bootstrap.min.js" type="text/javascript"></script>
+<script src="knockout-2.3.0.js" type="text/javascript"></script>
+<!--[if lt IE 11]>
+<script src="json2.js" type="text/javascript"></script>
+<![endif]-->
+
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-inner">
+            <a class="brand" href="#">iOS Devices</a>
+        </div>
+    </div>
+    <div id="main" class="container">
+        <b data-bind="text: hostname"></b>
+        <table class="table table-striped">
+            <tr><td><b>Device Name</td><td><b>Device Type</b></td><td><b>UDID</b></td><td><b>Action</b></td></tr>
+            <!-- ko foreach: devices -->
+            <tr>
+                <td><p data-bind="text: name"></p></td>
+                <td><p data-bind="text: product"></p></td>
+                <td><p data-bind="text: udid"></p></td>
+                <div class="btn-group">
+                    <td>
+                        <button data-bind="click: $parent.beginInstall" class="btn">Install app</button>
+                        <button data-bind="click: $parent.beginUninstall" class="btn">Uninstall app</button>
+                    </td>
+                </div>
+            </tr>
+            <!-- /ko -->
+        </table>
+    </div>
+
+    <div id="install" class="modal hide fade" tabindex="=1" role="dialog" aria-labelledby="installDialogLabel" aria-hidden="true">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+            <h3 id="installDialogLabel">Install app</h3>
+        </div>
+        <div class="modal-body">
+            <p><b>Device Name:&nbsp</b><span data-bind="text: name"></span></p>
+            <p><b>Device Type:&nbsp</b><span data-bind="text: product"></span></p>
+            <form role="form" onsubmit="return false">
+                <div class="control-group">
+                    <b class="control-label" for="inputAppPath">Path to App:</b>
+                    <!--[if lt IE 11]>&nbsp(Enter URL or path to plist, .ipa or .app)<![endif]-->
+                    <div class="controls">
+                        <input data-bind="value: appPath" type="text" id="inputAppPath" placeholder="URL or path to plist, .ipa or .app" style="width: 500px;">
+                    </div>
+
+                    <div class="control-group">
+                    <div class="controls">
+                        <label class="checkbox">
+                        <input type="checkbox"> Delete before install (plist only)
+                        </label>
+                    </div>
+                    </div>
+                    <h5>Result:</h5>
+                    <div>
+                        <pre data-bind="text: message">
+                        </pre>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" data-bind="click:installApp" class="btn btn-primary">Install</button>
+            <button type="button" class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
+        </div>
+    </div>
+
+    <div id="uninstall" class="modal hide fade" tabindex="=1" role="dialog" aria-labelledby="uninstallDialogLabel" aria-hidden="true">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+            <h3 id="uninstallDialogLabel">Uninstall app</h3>
+        </div>
+        <div class="modal-body">
+            <p><b>Device Name:&nbsp</b><span data-bind="text: name"/></span></p>
+            <p><b>Device Type:&nbsp</b><span data-bind="text: product"/></span></p>
+            <form role="form" onsubmit="return false">
+                <div class="control-group">
+                    <b class="control-label" for="inputBundleID">Bundle ID</b>
+                    <!--[if lt IE 11]>&nbsp e.g. com.vendor.appname (case sensitive)<![endif]-->
+                    <div class="controls">
+                        <input data-bind="value: bundleID" type="text" id="inputBundleID" placeholder="e.g. com.vendor.appname (case sensitive)" style="width: 500px;">
+                    </div>
+                    <h5>Result</h5>
+                    <div>
+                        <pre data-bind="text: message"></pre>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button data-bind="click:uninstallApp" class="btn btn-primary">Uninstall</button>
+            <button class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
+        </div>
+    </div>
+
+
+    <script type="text/javascript">
+        function DevicesViewModel() {
+            var self = this;
+            self.devicesURI = 'iosinst/api/v1.0/devices';
+            self.devices = ko.observableArray();
+            self.hostname = ko.observable();
+
+            self.ajax = function(uri, method, data) {
+                var request = {
+                    url: uri,
+                    type: method,
+                    contentType: "application/json",
+                    accepts: "application/json",
+                    cache: false,
+                    dataType: 'json',
+                    data: JSON.stringify(data)
+//                    error: function(jqXHR) {
+//                        console.log("ajax error " + jqXHR.status + " " + jqXHR.responseText);
+//                     }
+                };
+                return $.ajax(request);
+            }
+
+            self.showResult = function(message) {
+                console.log("response " + message);
+            }
+
+            self.beginInstall = function(device) {
+                installAppViewModel.setDevice(device);
+                $('#install').modal('show');
+            }
+
+            self.install = function(data) {
+                self.ajax(self.devicesURI, 'PUT', data).done(function(res) {
+                    self.showResult(res.message);
+                });
+            }
+
+            self.beginUninstall  = function(device) {
+                uninstallAppViewModel.setDevice(device);
+                $('#uninstall').modal('show');
+            }
+
+            self.uninstall = function(data) {
+                self.ajax(self.devicesURI, 'DELETE', data).done(function(res) {
+                    self.showResult(res.message);
+                });
+            }
+
+            self.listDevices = function() {
+                self.ajax(self.devicesURI, 'GET').done(function(data) {
+                    for (var i = 0; i < data.devices.length; i++) {
+                        self.devices.push({
+                            uri: ko.observable(data.devices[i].uri),
+                            name: ko.observable(data.devices[i].name),
+                            product: ko.observable(data.devices[i].product),
+                            udid: ko.observable(data.devices[i].udid)
+                        });
+                    }
+                });
+            }
+
+            self.gethostname = function() {
+                self.ajax('/iosinst/api/v1.0/hostname', 'GET').done(function(res) {
+                    self.hostname(res.hostname);
+                });
+            }
+
+            self.gethostname();
+            self.listDevices();
+        }
+
+        function InstallAppViewModel() {
+            var self = this;
+            self.name = ko.observable();
+            self.product = ko.observable();
+            self.udid = ko.observable();
+            self.appPath = ko.observable();
+            self.message = ko.observable();
+            self.deleteApp = ko.observable(false)
+
+            self.setDevice = function(device) {
+                self.device = device;
+                self.name(device.name());
+                self.product(device.product());
+                self.udid(device.udid());
+                self.appPath();
+                self.deleteApp(false);
+                self.message("");
+                $('#install').modal('show');
+            }
+
+            self.install = function(data) {
+                self.message("Installing, please wait...");
+                devicesViewModel.ajax(devicesViewModel.devicesURI, 'PUT', data).done(function(res) {
+                    self.message(res.message);
+                }).fail(function(jqXHR) {
+                    self.message(JSON.parse(jqXHR.responseText).message);
+                });
+            }
+
+            self.installApp = function() {
+                self.install({
+                    udid: self.udid(),
+                    appPath: self.appPath(),
+                    deleteApp: self.deleteApp()
+                });
+                //$('#install').modal('hide');
+            }
+        }
+
+        function UninstallAppViewModel() {
+            var self = this;
+            self.name = ko.observable();
+            self.product = ko.observable();
+            self.udid = ko.observable();
+            self.bundleID = ko.observable();
+            self.message = ko.observable();
+
+            self.setDevice = function(device) {
+                self.device = device;
+                self.name(device.name());
+                self.product(device.product());
+                self.udid(device.udid());
+                self.bundleID();
+                self.message("");
+                $('#uninstall').modal('show');
+            }
+
+            self.uninstall = function(data) {
+                self.message("Uninstalling...");
+                devicesViewModel.ajax(devicesViewModel.devicesURI, 'DELETE', data).done(function(res) {
+                    self.message(res.message);
+                }).fail(function(jqXHR) {
+                    self.message(JSON.parse(jqXHR.responseText).message);
+                });
+            }
+
+            self.uninstallApp = function() {
+                self.uninstall({
+                    udid: self.udid(),
+                    bundleID: self.bundleID()
+                });
+                //$('#install').modal('hide');
+            }
+        }
+
+        var devicesViewModel = new DevicesViewModel();
+        var installAppViewModel = new InstallAppViewModel();
+        var uninstallAppViewModel = new UninstallAppViewModel();
+
+        ko.applyBindings(devicesViewModel, $('#main')[0]);
+        ko.applyBindings(installAppViewModel, $('#install')[0]);
+        ko.applyBindings(uninstallAppViewModel, $('#uninstall')[0]);
+
+
+    </script>
+</body>
+</html>
